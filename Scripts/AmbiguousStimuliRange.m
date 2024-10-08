@@ -2,11 +2,11 @@
 % clear all
 % close all
 
-expData = load('expData.mat');
+expData = loadExpData('expData.mat');
 
-trialMatrix = expData.expData.trialMatrix;
-trialResponses = expData.expData.trialResponses;
-neuronPrefOrientations = expData.expData.preferredOrientation;
+trialMatrix = expData.trialMatrix;
+trialResponses = expData.trialResponses;
+neuronPrefOrientations = expData.preferredOrientation;
 
 stimVector = trialMatrix(:, 2);
 noisyStimVector = trialMatrix(:, 3);

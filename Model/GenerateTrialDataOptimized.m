@@ -23,7 +23,7 @@ timeStep = 0.001;      % Time step (1ms) for binning the stimulus duration
 % Stimulus parameters (angles in radians)
 stimParam.startInterval = deg2rad(90-5);               % Start of stimulus interval (radians)
 stimParam.endInterval = deg2rad(90+5);                 % End of stimulus interval (radians)
-stimParam.numStim = 3;                                 % Number of unique stimuli
+stimParam.numStim = 21;                                % Number of unique stimuli
 stimParam.countPerStim = 200;                          % Number of trials per stimulus
 ntrials = stimParam.numStim * stimParam.countPerStim;  % Total number of trials
 
@@ -33,6 +33,10 @@ stimVector = repelem(linspace(stimParam.startInterval, stimParam.endInterval, ..
     stimParam.numStim), stimParam.countPerStim);  % Vector of stimuli
 noisyStimVector = stimVector + stimNoise;         % Noisy stimulus vector
 
+shuffleIdx = randperm(ntrials);
+stimVector = stimVector(shuffleIdx);
+noisyStimVector = noisyStimVector(shuffleIdx);
+
 % Neuron preferred orientations and time bins
 neuronsPrefOrientation = zeros(1, nNeurons);      % Preferred orientation for each neuron
 timeBins = 0:timeStep:stimDuration;               % Time bins from 0 to stimDuration
@@ -40,8 +44,9 @@ timeBins = 0:timeStep:stimDuration;               % Time bins from 0 to stimDura
 % Stimulus response profile based on a normal distribution
 stimRespProfile = [0, normcdf(timeBins(2:end), .25, .05) .* 1./timeBins(2:end)];
 
-% Gain vector for modulated Poisson process (randomized for each trial, neuron, and time bin)
-gainVector = repmat(gamrnd(1./varGain, varGain, [ntrials, nNeurons]), [1, 1, length(timeBins)]);
+% Gain vector for modulated Poisson process (randomized for each trial, neuron)
+% Time bin based modulation is not included in this initialization to avoid memory problems.
+gainVector = gamrnd(1./varGain, varGain, [ntrials, nNeurons]);
 
 % Neuron tuning parameters
 tuningParams.d = zeros(1, nNeurons) + 0;           % Direction selectivity (fixed at 0)
@@ -63,7 +68,7 @@ neuronsPrefOrientation(:) = pi * rand(1, nNeurons);  % Random orientations from 
 
 % Structures to store final neuron spikes
 % Preallocate result and spike response matrices
-resultMat = zeros(stimParam.numStim, stimParam.countPerStim);
+trialDecisions = zeros(1, ntrials);
 neuronSpikeResponses = false(ntrials, nNeurons, length(timeBins)); % Creating a logical matrix to save memory
 
 % ----------------------------------
@@ -76,46 +81,73 @@ neuronSpikeResponses = false(ntrials, nNeurons, length(timeBins)); % Creating a 
 firingRates = orientationTunedFiringRate(noisyStimVector, ...
     neuronsPrefOrientation, tuningParams);
 
-% STEP 2: Compute stimulus response for each neuron over time
-% This multiplies the firing rates with a time-dependent stimulus response profile
-% Output: 
-%  - stimResponse: response of each neuron over time for each trial (nTrials x nNeurons x nTimeBins)
-stimResponse = firingRates.*reshape(stimRespProfile, 1, 1, length(stimRespProfile));
 
-for i = 1:stimParam.numStim
-    disp(i)
-    for j = 1:stimParam.countPerStim
-        trialIDx = (i-1)*stimParam.countPerStim + j;  % Index of the current trial
-        
-        % STEP 3: Generate modulated Poisson spikes for each trial
-        % Output:
-        %  - spikes: spike trains for each neuron in the trial
-        %  - modStimResponse: modified stimulus response after gain modulation
-        trlStimResponse = squeeze(stimResponse(trialIDx, :, :));  % Extract stimulus response for this trial
-        trlGainVector = squeeze(gainVector(trialIDx, :, :));      % Extract gain vector for this trial
-        params = struct();
-        params.timeStep = timeStep;
-        params.timeBins = timeBins;
-        params.nNeurons = nNeurons;
-        [spikes, modStimResponse] = generateModulatedPoissonSpikes(trlStimResponse, ...
-            trlGainVector, params);
-        
-        % STEP 4: Decode the stimulus orientation based on the spike trains
-        % Output:
-        %  - thetaMLE: maximum likelihood estimate of stimulus orientation based on spikes
-        %  - decodingError: error between decoded orientation and actual stimulus
-        params.stimDuration = stimDuration;
-        thetaMLE = decodeOrientationFromSpikes(spikes, ...
-            neuronsPrefOrientation, params, tuningParams);
-        decodingError = thetaMLE - noisyStimVector(trialIDx);
-        
-        % Decision: CW (-1) or CCW (1) based on decoded orientation
-        decision = (thetaMLE(end) > pi/2)*(-1) + (thetaMLE(end) <= pi/2)*(1);
-        
-        % Store spike trains and decision results
-        neuronSpikeResponses(trialIDx, :, :) = logical(spikes);  % Store spikes
-        resultMat(i, j) = decision;  % Store decision result (CW or CCW)
+for trialIDx = 1:ntrials
+    if mod(trialIDx, stimParam.countPerStim) == 0
+        disp(trialIDx)
     end
+
+    % STEP 2: Compute stimulus response for each neuron over time
+    % This multiplies the firing rates with a time-dependent stimulus response profile
+    % Output: 
+    %  - trlStimResponse: response of each neuron over time for each trial (nNeurons x nTimeBins)
+    trlStimResponse = firingRates(trialIDx, :)'.*stimRespProfile;
+
+    % STEP 3: Modulate gain of current trial based on previous trial
+    trlGainVector = squeeze(repmat(gainVector(trialIDx, :), [1, 1, length(timeBins)])); % Extract gain vector for this trial for each timebin
+    
+    if trialIDx > 1
+        prevTrialOrientation = noisyStimVector(trialIDx - 1);
+        prevTrialDecision = trialDecisions(trialIDx - 1);
+
+        % Preferred and null neuron based on previous trial
+        % decision (-1 CCW, 1 CW).
+        preferredNeuronIDx = (prevTrialDecision == -1 & neuronsPrefOrientation > pi/2) | ...
+            (prevTrialDecision == 1 & neuronsPrefOrientation <= pi/2);
+        nullNeuronIDx = ~preferredNeuronIDx;
+
+        % Get gain profiles for all the neurons
+        gainProfiles = getGainProfile(nNeurons, timeBins, stimDuration);
+        
+        % Increase gain for preferred neurons
+        t1 = gainProfiles(preferredNeuronIDx, :);
+        t2 = trlGainVector(preferredNeuronIDx, :);
+        t3 = t2 + 0.9*t1.*t2; % 0.5 is some factor so that gain does not go to zero
+        trlGainVector(preferredNeuronIDx, :) = t3;
+
+        % Decrease gain for null neurons
+        t1 = gainProfiles(nullNeuronIDx, :);
+        t2 = trlGainVector(nullNeuronIDx, :);
+        t3 = t2 - 0.9*t1.*t2; % 0.5 is some factor so that gain does not go to zero
+        trlGainVector(nullNeuronIDx, :) = t3;
+    end
+    
+    % STEP 3: Generate modulated Poisson spikes for each trial
+    % Output:
+    %  - spikes: spike trains for each neuron in the trial
+    %  - modStimResponse: modified stimulus response after gain modulation
+    params = struct();
+    params.timeStep = timeStep;
+    params.timeBins = timeBins;
+    params.nNeurons = nNeurons;
+    [spikes, modStimResponse] = generateModulatedPoissonSpikes(trlStimResponse, ...
+        trlGainVector, params);
+    
+    % STEP 4: Decode the stimulus orientation based on the spike trains
+    % Output:
+    %  - thetaMLE: maximum likelihood estimate of stimulus orientation based on spikes
+    %  - decodingError: error between decoded orientation and actual stimulus
+    params.stimDuration = stimDuration;
+    thetaMLE = decodeOrientationFromSpikes(spikes, ...
+        neuronsPrefOrientation, params, tuningParams);
+    decodingError = thetaMLE - noisyStimVector(trialIDx);
+    
+    % Decision: CW (-1) or CCW (1) based on decoded orientation
+    decision = (thetaMLE(end) > pi/2)*(-1) + (thetaMLE(end) <= pi/2)*(1);
+    
+    % Store spike trains and decision results
+    neuronSpikeResponses(trialIDx, :, :) = logical(spikes);  % Store spikes
+    trialDecisions(trialIDx) = decision;  % Store decision result (CW or CCW)
 end
 
 % ----------------------------------
@@ -123,15 +155,11 @@ end
 % ----------------------------------
 trialMatrix = zeros(ntrials, 4); % trial no, stim orientation, estimated decision
 
-for i = 1:stimParam.numStim
-    for j = 1:stimParam.countPerStim
-        trial_idx = j + (i - 1)*stimParam.countPerStim;
-
-        trialMatrix(trial_idx, 1) = trial_idx;                               % Trial index
-        trialMatrix(trial_idx, 2) = rad2deg(stimVector(trial_idx));          % Stimulus orientation
-        trialMatrix(trial_idx, 3) = rad2deg(noisyStimVector(trial_idx));     % Noisy stimulus orientation (actual)
-        trialMatrix(trial_idx, 4) = resultMat(i, j);                         % Decision 
-    end
+for trial_idx = 1:ntrials
+    trialMatrix(trial_idx, 1) = trial_idx;                               % Trial index
+    trialMatrix(trial_idx, 2) = rad2deg(stimVector(trial_idx));          % Stimulus orientation
+    trialMatrix(trial_idx, 3) = rad2deg(noisyStimVector(trial_idx));     % Noisy stimulus orientation (actual)
+    trialMatrix(trial_idx, 4) = trialDecisions(trial_idx);                          % Decision 
 end
 
 expData.trialMatrix = trialMatrix;
@@ -141,7 +169,7 @@ expData.trialResponses = neuronSpikeResponses;
 expData.columnDescriptions.trialResponses = {'Spike responses for ntrials x nNeurons x nTimeBins. The values are stored in a logical matrix. Since each element in the matrix can be either zero or one, the logical matrix uses one bit of memory per element, instead of one byte used by standard matrix.'};
 expData.timeBins = timeBins;
 
-% save('expData.mat', 'expData', '-v7.3');
+save('./Data/expData_modgain_0.9_inv.mat', 'expData', '-v7.3');
 
 
 % ----------------------------------
@@ -185,7 +213,7 @@ psychometricData = zeros(1, length(uniqStim));
 for i=1:stimParam.numStim
     stimOrientation = uniqStim(i);
     givenOrientationTrialIDxes = find(stimVector == stimOrientation);
-    decision = resultMat(i, :);
+    decision = trialDecisions(givenOrientationTrialIDxes);
     
     percent_CW = length(find(decision == -1)) / length(decision);
     psychometricData(i) = percent_CW;
@@ -200,3 +228,37 @@ xlabel("Orientation (deg)")
 ylabel("% CCW")
 title('Psychometric Function Fit');
 hold off
+
+% %%
+% 
+% % GAINS
+% 
+% % Number of distributions
+% nDistributions = 100;
+% 
+% % Define the range of x-values for the cumulative Gaussian (e.g., -5 to 5)
+% x = linspace(0, stimDuration, 1000);
+% 
+% % Preallocate for storing the 100 cumulative distributions
+% cumulativeGaussians = zeros(nDistributions, length(x));
+% 
+% % Generate random parameters (mean and standard deviation) for each distribution
+% means = 0.4 + 0.1*randn(1, nDistributions);           % Random means from normal distribution
+% stdDevs = 0.08*rand(1, nDistributions);    % Random std devs (from uniform, shifted to avoid near-zero values)
+% 
+% % Generate the cumulative Gaussian for each parameter set
+% for i = 1:nDistributions
+%     cumulativeGaussians(i, :) = normcdf(x, means(i), stdDevs(i));
+% end
+% 
+% % Plotting first few cumulative Gaussian distributions for visualization
+% figure;
+% subplot(2, 1, 1)
+% hold on;
+% for i = 1:nDistributions  % Plot first 5 distributions
+%     plot(x, cumulativeGaussians(i, :));
+% end
+% hold off;
+% title('Cumulative Gaussian Distributions');
+% xlabel('x');
+% ylabel('Cumulative Probability');

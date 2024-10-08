@@ -17,5 +17,6 @@ function expData = loadExpData(filename)
     expData = loadedData.expData;
     
     % Convert logical trialResponses matrix to double 
-    expData.trialResponses = double(expData.trialResponses);  % Convert logical matrix to double
+    % expData.trialResponses = double(expData.trialResponses);  % Convert logical matrix to double
+    expData.trialResponses = expData.trialResponses;
 end

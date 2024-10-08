@@ -1,15 +1,15 @@
 % clc
 % clear all
 % close all
-%%
+
 rng('shuffle');
 
-expData = loadExpData('expData.mat');
+expData = loadExpData('./Data/expData_modgain_0.9_inv.mat');
 
 trialMatrix = expData.trialMatrix;
 trialResponses = expData.trialResponses;
 neuronPrefOrientations = expData.preferredOrientation;
-%%
+
 ambiguousStimuliOrientation = 90; % In degrees
 neuronPreferredDirection = (neuronPrefOrientations > 90) * (-1) + (neuronPrefOrientations <= 90) * (1); % What about neurons which have 90 degree orientation
 ambiguousStimTrialsIDx = find(trialMatrix(:, 2) == ambiguousStimuliOrientation);

@@ -6,11 +6,11 @@
 
 rng('shuffle');
 
-expData = load('expData_corr.mat');
+expData = loadExpData('expData_corr.mat');
 
-trialMatrix = expData.expData.trialMatrix;
-trialResponses = expData.expData.trialResponses;
-neuronPrefOrientations = expData.expData.preferredOrientation;
+trialMatrix = expData.trialMatrix;
+trialResponses = expData.trialResponses;
+neuronPrefOrientations = expData.preferredOrientation;
 
 ambiguousStimuliOrientation = 90; % In degrees
 neuronPreferredDirection = (neuronPrefOrientations > 90) * (-1) + (neuronPrefOrientations <= 90) * (1); % What about neurons which have 90 degree orientation
