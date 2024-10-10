@@ -21,9 +21,9 @@ varGain = 0.5;         % Variance in gain for modulated Poisson process
 timeStep = 0.001;      % Time step (1ms) for binning the stimulus duration
 
 % Stimulus parameters (angles in radians)
-stimParam.startInterval = deg2rad(90-5);               % Start of stimulus interval (radians)
-stimParam.endInterval = deg2rad(90+5);                 % End of stimulus interval (radians)
-stimParam.numStim = 21;                                % Number of unique stimuli
+stimParam.startInterval = deg2rad(90-15);              % Start of stimulus interval (radians)
+stimParam.endInterval = deg2rad(90+15);                % End of stimulus interval (radians)
+stimParam.numStim = 31;                                % Number of unique stimuli
 stimParam.countPerStim = 200;                          % Number of trials per stimulus
 ntrials = stimParam.numStim * stimParam.countPerStim;  % Total number of trials
 
@@ -71,6 +71,10 @@ neuronsPrefOrientation(:) = pi * rand(1, nNeurons);  % Random orientations from 
 trialDecisions = zeros(1, ntrials);
 neuronSpikeResponses = false(ntrials, nNeurons, length(timeBins)); % Creating a logical matrix to save memory
 
+% Variable to control the extent to which top-down gain should modulate the
+% gain parameter
+topDownGainHandle = 0.3;
+
 % ----------------------------------
 % Computing stimulus response begins
 % ----------------------------------
@@ -93,6 +97,9 @@ for trialIDx = 1:ntrials
     %  - trlStimResponse: response of each neuron over time for each trial (nNeurons x nTimeBins)
     trlStimResponse = firingRates(trialIDx, :)'.*stimRespProfile;
 
+    % Add background spontaneous noise
+    trlStimResponse = trlStimResponse + lognrnd(1, 0.8, nNeurons, length(timeBins));
+
     % STEP 3: Modulate gain of current trial based on previous trial
     trlGainVector = squeeze(repmat(gainVector(trialIDx, :), [1, 1, length(timeBins)])); % Extract gain vector for this trial for each timebin
     
@@ -112,13 +119,13 @@ for trialIDx = 1:ntrials
         % Increase gain for preferred neurons
         t1 = gainProfiles(preferredNeuronIDx, :);
         t2 = trlGainVector(preferredNeuronIDx, :);
-        t3 = t2 + 0.9*t1.*t2; % 0.5 is some factor so that gain does not go to zero
+        t3 = t2 + topDownGainHandle*t1.*t2; % 0.5 is some factor so that gain does not go to zero
         trlGainVector(preferredNeuronIDx, :) = t3;
-
+        
         % Decrease gain for null neurons
         t1 = gainProfiles(nullNeuronIDx, :);
         t2 = trlGainVector(nullNeuronIDx, :);
-        t3 = t2 - 0.9*t1.*t2; % 0.5 is some factor so that gain does not go to zero
+        t3 = t2 - topDownGainHandle*t1.*t2; % 0.5 is some factor so that gain does not go to zero
         trlGainVector(nullNeuronIDx, :) = t3;
     end
     
@@ -169,7 +176,7 @@ expData.trialResponses = neuronSpikeResponses;
 expData.columnDescriptions.trialResponses = {'Spike responses for ntrials x nNeurons x nTimeBins. The values are stored in a logical matrix. Since each element in the matrix can be either zero or one, the logical matrix uses one bit of memory per element, instead of one byte used by standard matrix.'};
 expData.timeBins = timeBins;
 
-save('./Data/expData_modgain_0.9_inv.mat', 'expData', '-v7.3');
+save('./Data/expData.mat', 'expData', '-v7.3');
 
 
 % ----------------------------------
