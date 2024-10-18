@@ -2,7 +2,7 @@
 % clear all
 % close all
 
-expData = loadExpData('expData.mat');
+expData = loadExpData('./Data/expData_contrast_0.3.mat');
 
 trialMatrix = expData.trialMatrix;
 trialResponses = expData.trialResponses;

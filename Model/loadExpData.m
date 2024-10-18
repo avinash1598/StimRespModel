@@ -18,5 +18,8 @@ function expData = loadExpData(filename)
     
     % Convert logical trialResponses matrix to double 
     % expData.trialResponses = double(expData.trialResponses);  % Convert logical matrix to double
+    
+    % Don't convert logical trialResponses to double since it blows up the
+    % memory used.
     expData.trialResponses = expData.trialResponses;
 end

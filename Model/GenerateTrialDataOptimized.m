@@ -21,8 +21,8 @@ varGain = 0.5;         % Variance in gain for modulated Poisson process
 timeStep = 0.001;      % Time step (1ms) for binning the stimulus duration
 
 % Stimulus parameters (angles in radians)
-stimParam.startInterval = deg2rad(90-5);               % Start of stimulus interval (radians)
-stimParam.endInterval = deg2rad(90+5);                 % End of stimulus interval (radians)
+stimParam.startInterval = deg2rad(90-21);              % Start of stimulus interval (radians)
+stimParam.endInterval = deg2rad(90+21);                % End of stimulus interval (radians)
 stimParam.numStim = 21;                                % Number of unique stimuli
 stimParam.countPerStim = 200;                          % Number of trials per stimulus
 ntrials = stimParam.numStim * stimParam.countPerStim;  % Total number of trials
@@ -71,6 +71,16 @@ neuronsPrefOrientation(:) = pi * rand(1, nNeurons);  % Random orientations from 
 trialDecisions = zeros(1, ntrials);
 neuronSpikeResponses = false(ntrials, nNeurons, length(timeBins)); % Creating a logical matrix to save memory
 
+% Variable to control the extent to which top-down gain should modulate the
+% gain parameter
+topDownGainHandle = 0.3;
+
+% Set contrast level for each stimulus independently. Only for
+% non-ambiguous stimuli set the contrast level to some low value.
+contrastLevel = zeros(size(noisyStimVector)) + 1;
+ambiguousStimIDx = (stimVector==deg2rad(90));
+contrastLevel(~ambiguousStimIDx) = 0.1; % Set contrast of non-ambiguous stimuli
+
 % ----------------------------------
 % Computing stimulus response begins
 % ----------------------------------
@@ -93,6 +103,12 @@ for trialIDx = 1:ntrials
     %  - trlStimResponse: response of each neuron over time for each trial (nNeurons x nTimeBins)
     trlStimResponse = firingRates(trialIDx, :)'.*stimRespProfile;
 
+    % Adjust the firing rate based on contrast level
+    trlStimResponse = contrastLevel(trialIDx)*trlStimResponse;
+
+    % Add background spontaneous noise
+    trlStimResponse = trlStimResponse + lognrnd(1, 0.8, nNeurons, length(timeBins));
+
     % STEP 3: Modulate gain of current trial based on previous trial
     trlGainVector = squeeze(repmat(gainVector(trialIDx, :), [1, 1, length(timeBins)])); % Extract gain vector for this trial for each timebin
     
@@ -110,15 +126,27 @@ for trialIDx = 1:ntrials
         gainProfiles = getGainProfile(nNeurons, timeBins, stimDuration);
         
         % Increase gain for preferred neurons
+        % Note: Amount of increase/decrease in gain also depends upon 
+        % contrast of previous stimuli. Gain changes due to contrast only
+        % acts on the top-down gain compoenent.
         t1 = gainProfiles(preferredNeuronIDx, :);
         t2 = trlGainVector(preferredNeuronIDx, :);
-        t3 = t2 + 0.9*t1.*t2; % 0.5 is some factor so that gain does not go to zero
+        % Contrast independent gain changes
+        % t3 = t2 + topDownGainHandle*t1.*t2; % 0.5 is some factor so that gain does not go to zero
+        % Contrast dependent gain changes
+        t3 = t2 + contrastLevel(trialIDx-1)*topDownGainHandle*t1.*t2; % 0.5 is some factor so that gain does not go to zero
         trlGainVector(preferredNeuronIDx, :) = t3;
-
+        
         % Decrease gain for null neurons
+        % Note: Amount of increase/decrease in gain also depends upon 
+        % contrast of previous stimuli. Gain changes due to contrast only
+        % acts on the top-down gain compoenent.
         t1 = gainProfiles(nullNeuronIDx, :);
         t2 = trlGainVector(nullNeuronIDx, :);
-        t3 = t2 - 0.9*t1.*t2; % 0.5 is some factor so that gain does not go to zero
+        % Contrast independent gain changes
+        % t3 = t2 - topDownGainHandle*t1.*t2; % 0.5 is some factor so that gain does not go to zero
+        % Contrast dependent gain changes
+        t3 = t2 - contrastLevel(trialIDx-1)*topDownGainHandle*t1.*t2; % 0.5 is some factor so that gain does not go to zero
         trlGainVector(nullNeuronIDx, :) = t3;
     end
     
@@ -159,7 +187,7 @@ for trial_idx = 1:ntrials
     trialMatrix(trial_idx, 1) = trial_idx;                               % Trial index
     trialMatrix(trial_idx, 2) = rad2deg(stimVector(trial_idx));          % Stimulus orientation
     trialMatrix(trial_idx, 3) = rad2deg(noisyStimVector(trial_idx));     % Noisy stimulus orientation (actual)
-    trialMatrix(trial_idx, 4) = trialDecisions(trial_idx);                          % Decision 
+    trialMatrix(trial_idx, 4) = trialDecisions(trial_idx);               % Decision 
 end
 
 expData.trialMatrix = trialMatrix;
@@ -169,8 +197,7 @@ expData.trialResponses = neuronSpikeResponses;
 expData.columnDescriptions.trialResponses = {'Spike responses for ntrials x nNeurons x nTimeBins. The values are stored in a logical matrix. Since each element in the matrix can be either zero or one, the logical matrix uses one bit of memory per element, instead of one byte used by standard matrix.'};
 expData.timeBins = timeBins;
 
-save('./Data/expData_modgain_0.9_inv.mat', 'expData', '-v7.3');
-
+save('./Data/expData.mat', 'expData', '-v7.3');
 
 % ----------------------------------
 % Plot results
@@ -228,37 +255,3 @@ xlabel("Orientation (deg)")
 ylabel("% CCW")
 title('Psychometric Function Fit');
 hold off
-
-% %%
-% 
-% % GAINS
-% 
-% % Number of distributions
-% nDistributions = 100;
-% 
-% % Define the range of x-values for the cumulative Gaussian (e.g., -5 to 5)
-% x = linspace(0, stimDuration, 1000);
-% 
-% % Preallocate for storing the 100 cumulative distributions
-% cumulativeGaussians = zeros(nDistributions, length(x));
-% 
-% % Generate random parameters (mean and standard deviation) for each distribution
-% means = 0.4 + 0.1*randn(1, nDistributions);           % Random means from normal distribution
-% stdDevs = 0.08*rand(1, nDistributions);    % Random std devs (from uniform, shifted to avoid near-zero values)
-% 
-% % Generate the cumulative Gaussian for each parameter set
-% for i = 1:nDistributions
-%     cumulativeGaussians(i, :) = normcdf(x, means(i), stdDevs(i));
-% end
-% 
-% % Plotting first few cumulative Gaussian distributions for visualization
-% figure;
-% subplot(2, 1, 1)
-% hold on;
-% for i = 1:nDistributions  % Plot first 5 distributions
-%     plot(x, cumulativeGaussians(i, :));
-% end
-% hold off;
-% title('Cumulative Gaussian Distributions');
-% xlabel('x');
-% ylabel('Cumulative Probability');
