@@ -41,7 +41,7 @@ Through this analysis, the project aims to provide insights into refining experi
    - trialResponses: Neural responses, i.e., spiking data from all the defined neurons for each stimulus shown to the model.
    
 2. **`GenerateTrialData.m`**:  
-   - Generates gain profiles for a given number of neurons over time using cumulative Gaussian distributions.
+   Functions similarly to `GenerateTrialDataOptimized.m`, except that the code is not optimized for memory and might exhaust RAM as the simulation parameters increase. Whereas, `GenerateTrialDataOptimized.m` is optimized for memory and can run on systems with very low RAM (8 GB).
    
 3. **`decodeOrientationFromSpikes.m`**:  
    - Calculates the choice probability (CP) for each neuron based on its firing rates and trial labels.
