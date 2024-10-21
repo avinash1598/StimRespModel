@@ -12,25 +12,24 @@ The primary goal of this model is to investigate trial-to-trial variability in n
 Through this analysis, the project aims to provide insights into refining experimental setups to more accurately capture neural activity related to decision-making, and to better handle sources of noise or bias that might impact CP.
 
 ### **Key Features**:
-- Simulates neural responses to Gabor stimuli with varying orientations.
-- Computes firing rates across neurons over time.
-- Implements a choice probability (CP) metric for decision-related analysis.
-- Supports statistical significance testing via permutation tests.
-- Customizable gain profiles for individual neurons.
+- Simulates neural responses to Gabor stimuli with varying orientations (adapted from LN-LN cascade model)
+- Uses modulated poisson process to generate spikes across for neurons
+- Implement a choice probability (CP) metric for analyzing trial-by-trial correlation between decision and neural firing
+- Customizable gain profiles for individual neurons to mimic the top-down modulation of neural firing.
 
 ## **Installation**
 
 1. **Clone the repository**:
 
     ```bash
-    git clone https://github.com/your-username/stimulus-response-model.git
+    git clone https://github.com/avinash1598/StimRespModel.git
     ```
 
 2. **Open the MATLAB code**:  
    Open MATLAB and navigate to the cloned repository folder.
 
 3. **Run the script**:  
-   You can run the main script `main.m` or any other provided functions directly in MATLAB.
+   The main script `GenerateTrialDataOptimized.m` implements the LN-LN (Linear-Nonlinear) cascade model and a modulated Poisson process to simulate neural responses to various stimulus orientations. The generated neural spike data is then saved to a file for further analysis.
 
 ## **Usage**
 
