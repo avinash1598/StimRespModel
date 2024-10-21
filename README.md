@@ -33,19 +33,27 @@ Through this analysis, the project aims to provide insights into refining experi
 
 ## **Usage**
 
-### **Main Scripts and Functions**:
+### **Main Scripts for Model**:
 
-1. **`main.m`**:  
-   - The entry point to the model simulation. It sets up the stimulus parameters and executes the analysis.
+1. **`GenerateTrialDataOptimized.m`**:  
+   Main script that implements the LN-LN cascade model and uses a modulated Poisson process to generate trial-by-trial neural response data. In this script, key simulation parameters, such as the number of neurons, stimulus vector, and stimulus duration, can be defined. The script then runs the simulation and generates the following key data, which is saved to a file:
+   - trialMatrix: Behavioral data containing details of the stimulus orientations used for the simulation and the decision made by the model for each of those orientations.
+   - trialResponses: Neural responses, i.e., spiking data from all the defined neurons for each stimulus shown to the model.
    
-2. **`getGainProfile.m`**:  
+2. **`GenerateTrialData.m`**:  
    - Generates gain profiles for a given number of neurons over time using cumulative Gaussian distributions.
    
-3. **`computeChoiceProbability.m`**:  
+3. **`decodeOrientationFromSpikes.m`**:  
    - Calculates the choice probability (CP) for each neuron based on its firing rates and trial labels.
 
-4. **`permutationTest.m`**:  
+4. **`generateModulatedPoissonSpikes.m`**:  
    - Performs a permutation test to assess the significance of the computed CP values.
+    
+5. **`orientationTunedFiringRate.m`**:  
+   - Performs a permutation test to assess the significance of the computed CP values.
+  
+6. **`getGainProfile.m`**:
+   - 
 
 ### **Example Usage**:
 
