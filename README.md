@@ -44,29 +44,13 @@ Through this analysis, the project aims to provide insights into refining experi
    Functions similarly to `GenerateTrialDataOptimized.m`, except that the code is not optimized for memory and might exhaust RAM as the simulation parameters increase. Whereas, `GenerateTrialDataOptimized.m` is optimized for memory and can run on systems with very low RAM (8 GB).
    
 3. **`decodeOrientationFromSpikes.m`**:  
-   - Calculates the choice probability (CP) for each neuron based on its firing rates and trial labels.
+   - TBD
 
 4. **`generateModulatedPoissonSpikes.m`**:  
-   - Performs a permutation test to assess the significance of the computed CP values.
+   - TBD
     
 5. **`orientationTunedFiringRate.m`**:  
-   - Performs a permutation test to assess the significance of the computed CP values.
+   - TBD
   
 6. **`getGainProfile.m`**:
-   - 
-
-### **Example Usage**:
-
-```matlab
-nNeurons = 100;
-timeBins = linspace(0, 1, 100); % 100 time bins for 1-second stimulus duration
-stimDur = 1; % Stimulus duration in seconds
-
-% Generate gain profiles
-gainProfiles = getGainProfile(nNeurons, timeBins, stimDur);
-
-% Compute choice probability for simulated data
-cpValues = computeChoiceProbability(firingRates, labels);
-
-% Assess significance using permutation test
-pValues = permutationTest(firingRates, labels, numPermutations);
+   - TBD
